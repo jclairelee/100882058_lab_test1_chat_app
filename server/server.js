@@ -15,6 +15,11 @@ app.use(express.json());
 const authRoutes = require("./routes/auth");
 app.use("/api/auth", authRoutes);
 
+const path = require("path");
+
+// serve frontend files
+app.use(express.static(path.join(__dirname, "../view")));
+
 // Basic health check
 app.get("/", (req, res) => res.send("Chat server running"));
 
