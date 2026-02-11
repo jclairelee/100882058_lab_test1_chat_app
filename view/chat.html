@@ -10,7 +10,46 @@
   <body class="container mt-4">
     <h2>Chat App</h2>
 
-    <!-- Room Selection -->
+    <!-- ================= PRIVATE CHAT SECTION ================= -->
+
+    <hr />
+    <h5>Private Chat (1-to-1)</h5>
+
+    <div class="mb-2">
+      <label>Select User:</label>
+      <select id="userSelect" class="form-select"></select>
+    </div>
+
+    <button id="loadPrivateBtn" class="btn btn-dark mb-3">
+      Open Private Chat
+    </button>
+
+    <div id="privateChatArea" style="display: none">
+      <h6 id="privateTitle"></h6>
+
+      <div
+        id="privateMessages"
+        class="border p-3 mb-2"
+        style="height: 200px; overflow-y: auto"
+      ></div>
+
+      <!-- Typing indicator -->
+      <div id="typingIndicator" style="color: gray; font-style: italic"></div>
+
+      <input
+        type="text"
+        id="privateInput"
+        class="form-control mb-2"
+        placeholder="Type private message..."
+      />
+
+      <button id="sendPrivateBtn" class="btn btn-dark">Send Private</button>
+    </div>
+
+    <hr />
+
+    <!-- ================= ROOM CHAT SECTION ================= -->
+
     <div id="roomSelection">
       <label>Select Room:</label>
       <select id="roomSelect" class="form-select mb-2">
@@ -24,7 +63,6 @@
       <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
     </div>
 
-    <!-- Chat Area -->
     <div id="chatArea" style="display: none">
       <div class="d-flex justify-content-between">
         <h4 id="roomTitle"></h4>
@@ -54,36 +92,156 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-      // Connect to same server (important)
-      const socket = io();
+      // ================= SETUP =================
 
+      const socket = io();
       const user = JSON.parse(localStorage.getItem("chatUser"));
 
-      // Redirect if not logged in
       if (!user) {
         window.location.href = "login.html";
       }
 
-      let currentRoom = null;
+      // register user for private messaging
+      socket.emit("registerUser", { username: user.username });
 
-      // JOIN ROOM
+      let currentRoom = null;
+      let privateTarget = null;
+
+      // ================= LOAD USERS =================
+
+      async function loadUsers() {
+        const res = await fetch("/api/users");
+        const users = await res.json();
+
+        const select = document.getElementById("userSelect");
+        select.innerHTML = "";
+
+        users.forEach((u) => {
+          if (u.username !== user.username) {
+            const opt = document.createElement("option");
+            opt.value = u.username;
+            opt.textContent = u.username;
+            select.appendChild(opt);
+          }
+        });
+      }
+      loadUsers();
+
+      // ================= PRIVATE CHAT =================
+
+      document
+        .getElementById("loadPrivateBtn")
+        .addEventListener("click", async () => {
+          privateTarget = document.getElementById("userSelect").value;
+          if (!privateTarget) return;
+
+          document.getElementById("privateTitle").innerText =
+            "Private chat with: " + privateTarget;
+
+          document.getElementById("privateChatArea").style.display = "block";
+          document.getElementById("privateMessages").innerHTML = "";
+
+          const res = await fetch(
+            `/api/messages/private/${user.username}/${privateTarget}`,
+          );
+
+          const history = await res.json();
+
+          history.forEach((m) => {
+            const div = document.createElement("div");
+            div.innerHTML = `<strong>${m.from_user}:</strong> ${m.message}`;
+            document.getElementById("privateMessages").appendChild(div);
+          });
+        });
+
+      // send private message
+      document
+        .getElementById("sendPrivateBtn")
+        .addEventListener("click", () => {
+          const input = document.getElementById("privateInput");
+          const msg = input.value;
+
+          if (!msg || !privateTarget) return;
+
+          socket.emit("privateMessage", {
+            from_user: user.username,
+            to_user: privateTarget,
+            message: msg,
+          });
+
+          input.value = "";
+        });
+
+      // receive private message
+      socket.on("privateMessage", (data) => {
+        const relevant =
+          privateTarget &&
+          ((data.from_user === user.username &&
+            data.to_user === privateTarget) ||
+            (data.from_user === privateTarget &&
+              data.to_user === user.username));
+
+        if (!relevant) return;
+
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${data.from_user}:</strong> ${data.message}`;
+        document.getElementById("privateMessages").appendChild(div);
+      });
+
+      // ================= TYPING INDICATOR =================
+
+      let typingTimeout = null;
+
+      document.getElementById("privateInput").addEventListener("input", () => {
+        if (!privateTarget) return;
+
+        socket.emit("privateTyping", {
+          from_user: user.username,
+          to_user: privateTarget,
+          isTyping: true,
+        });
+
+        clearTimeout(typingTimeout);
+        typingTimeout = setTimeout(() => {
+          socket.emit("privateTyping", {
+            from_user: user.username,
+            to_user: privateTarget,
+            isTyping: false,
+          });
+        }, 800);
+      });
+
+      socket.on("privateTyping", (data) => {
+        if (!privateTarget) return;
+
+        if (data.from_user === privateTarget) {
+          const indicator = document.getElementById("typingIndicator");
+
+          if (data.isTyping) {
+            indicator.innerText = `${data.from_user} is typing...`;
+          } else {
+            indicator.innerText = "";
+          }
+        }
+      });
+
+      // ================= ROOM CHAT =================
+
       document
         .getElementById("joinRoomBtn")
         .addEventListener("click", async () => {
           const room = document.getElementById("roomSelect").value;
           currentRoom = room;
 
-          // Clear previous messages
           document.getElementById("messages").innerHTML = "";
 
-          // Fetch old messages from MongoDB
           const res = await fetch(`/api/messages/group/${room}`);
           const oldMessages = await res.json();
 
           oldMessages.forEach((msg) => {
-            const msgDiv = document.createElement("div");
-            msgDiv.innerHTML = `<strong>${msg.from_user}:</strong> ${msg.message}`;
-            document.getElementById("messages").appendChild(msgDiv);
+            const div = document.createElement("div");
+            div.innerHTML = `<strong>${msg.from_user}:</strong> ${msg.message}`;
+            document.getElementById("messages").appendChild(div);
           });
 
           socket.emit("joinRoom", { username: user.username, room });
@@ -93,7 +251,6 @@
           document.getElementById("chatArea").style.display = "block";
         });
 
-      // LEAVE ROOM
       document.getElementById("leaveRoomBtn").addEventListener("click", () => {
         socket.emit("leaveRoom", {
           username: user.username,
@@ -107,10 +264,9 @@
         currentRoom = null;
       });
 
-      // SEND MESSAGE
       document.getElementById("sendBtn").addEventListener("click", () => {
-        const messageInput = document.getElementById("messageInput");
-        const msg = messageInput.value;
+        const input = document.getElementById("messageInput");
+        const msg = input.value;
 
         if (!msg || !currentRoom) return;
 
@@ -120,20 +276,17 @@
           message: msg,
         });
 
-        messageInput.value = "";
+        input.value = "";
       });
 
-      // RECEIVE MESSAGE
       socket.on("groupMessage", (data) => {
-        const msgDiv = document.createElement("div");
-        msgDiv.innerHTML = `<strong>${data.from_user}:</strong> ${data.message}`;
-
-        const messages = document.getElementById("messages");
-        messages.appendChild(msgDiv);
-        messages.scrollTop = messages.scrollHeight;
+        const div = document.createElement("div");
+        div.innerHTML = `<strong>${data.from_user}:</strong> ${data.message}`;
+        document.getElementById("messages").appendChild(div);
       });
 
-      // LOGOUT
+      // ================= LOGOUT =================
+
       document.getElementById("logoutBtn").addEventListener("click", () => {
         localStorage.removeItem("chatUser");
         window.location.href = "login.html";

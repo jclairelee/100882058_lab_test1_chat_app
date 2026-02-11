@@ -107,6 +107,14 @@ io.on("connection", (socket) => {
     }
   });
 
+  // Private Typing Indicator
+  socket.on("privateTyping", ({ from_user, to_user, isTyping }) => {
+    io.to(`user:${to_user}`).emit("privateTyping", {
+      from_user,
+      isTyping,
+    });
+  });
+
   socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
 });
 
