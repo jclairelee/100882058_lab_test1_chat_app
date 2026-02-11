@@ -29,7 +29,34 @@ const path = require("path");
 app.use(express.static(path.join(__dirname, "../view")));
 
 // Basic health check
-app.get("/", (req, res) => res.send("Chat server running"));
+app.get("/", (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Chat Server</title>
+      <style>
+        body { font-family: Arial; text-align: center; margin-top: 100px; }
+        button { padding: 10px 20px; font-size: 16px; }
+      </style>
+    </head>
+    <body>
+      <h2>Chat Server Running</h2>
+      <p>Redirecting to Signup page...</p>
+
+      <button onclick="window.location.href='/signup.html'">
+        Go to Signup Now
+      </button>
+
+      <script>
+        setTimeout(function() {
+          window.location.href = "/signup.html";
+        }, 3000);
+      </script>
+    </body>
+    </html>
+  `);
+});
 
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: "*" } });
