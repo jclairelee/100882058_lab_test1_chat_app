@@ -6,6 +6,10 @@ Semester: Winter 2026
 
 ---
 
+## Preview Screenshots
+
+![Preview Screenshots](/Screenshot.png)
+
 ## Project Overview
 
 This is a real-time chat application built using:
