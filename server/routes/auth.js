@@ -30,4 +30,36 @@ router.post("/signup", async (req, res) => {
   }
 });
 
+// Login API
+router.post("/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const user = await User.findOne({ username });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid username" });
+    }
+
+    if (user.password !== password) {
+      return res.status(400).json({ message: "Invalid password" });
+    }
+
+    res.status(200).json({
+      message: "Login successful",
+      user: {
+        username: user.username,
+        firstname: user.firstname,
+        lastname: user.lastname,
+      },
+    });
+  } catch (err) {
+    res.status(500).json({ message: "Server error" });
+  }
+});
+
 module.exports = router;
