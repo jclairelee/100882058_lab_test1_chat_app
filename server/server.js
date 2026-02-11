@@ -1,12 +1,18 @@
+// Main server
+require("dotenv").config();
+
 const express = require("express");
 const http = require("http");
 const cors = require("cors");
 const { Server } = require("socket.io");
 
+const connectDB = require("./config/db");
+
 const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Basic health check
 app.get("/", (req, res) => res.send("Chat server running"));
 
 const server = http.createServer(app);
@@ -18,6 +24,14 @@ io.on("connection", (socket) => {
 });
 
 const PORT = process.env.PORT || 3000;
-server.listen(PORT, () =>
-  console.log(`Server listening on http://localhost:${PORT}`),
-);
+
+connectDB()
+  .then(() => {
+    server.listen(PORT, () =>
+      console.log(`Server listening on http://localhost:${PORT}`),
+    );
+  })
+  .catch((err) => {
+    console.error("Failed to connect MongoDB:", err.message);
+    process.exit(1);
+  });
