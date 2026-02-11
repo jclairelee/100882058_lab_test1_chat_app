@@ -16,6 +16,9 @@ app.use(express.json());
 const authRoutes = require("./routes/auth");
 app.use("/api/auth", authRoutes);
 
+const messageRoutes = require("./routes/messages");
+app.use("/api/messages", messageRoutes);
+
 const path = require("path");
 
 // serve frontend files
