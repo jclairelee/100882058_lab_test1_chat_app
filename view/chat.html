@@ -14,11 +14,11 @@
     <div id="roomSelection">
       <label>Select Room:</label>
       <select id="roomSelect" class="form-select mb-2">
-        <option value="devops">DevOps</option>
-        <option value="cloud computing">Cloud Computing</option>
-        <option value="covid19">Covid19</option>
-        <option value="sports">Sports</option>
-        <option value="nodeJS">NodeJS</option>
+        <option value="Full Stack">Full Stack</option>
+        <option value="Machine Learning">Machine Learning</option>
+        <option value="Capstone">Capstone</option>
+        <option value="Mobile App">Mobile App</option>
+        <option value="Cyber Security">Cyber Security</option>
       </select>
 
       <button id="joinRoomBtn" class="btn btn-primary">Join Room</button>
@@ -45,6 +45,7 @@
         class="form-control mb-2"
         placeholder="Type message..."
       />
+
       <button id="sendBtn" class="btn btn-success">Send</button>
     </div>
 
@@ -53,7 +54,8 @@
     <script src="/socket.io/socket.io.js"></script>
 
     <script>
-      const socket = io("http://localhost:3000");
+      // Connect to same server (important)
+      const socket = io();
 
       const user = JSON.parse(localStorage.getItem("chatUser"));
 
@@ -64,31 +66,74 @@
 
       let currentRoom = null;
 
-      // Join Room
-      document.getElementById("joinRoomBtn").addEventListener("click", () => {
-        const room = roomSelect.value;
-        currentRoom = room;
+      // JOIN ROOM
+      document
+        .getElementById("joinRoomBtn")
+        .addEventListener("click", async () => {
+          const room = document.getElementById("roomSelect").value;
+          currentRoom = room;
 
-        socket.emit("joinRoom", { username: user.username, room });
+          // Clear previous messages
+          document.getElementById("messages").innerHTML = "";
 
-        roomTitle.innerText = "Room: " + room;
-        roomSelection.style.display = "none";
-        chatArea.style.display = "block";
-      });
+          // Fetch old messages from MongoDB
+          const res = await fetch(`/api/messages/group/${room}`);
+          const oldMessages = await res.json();
 
-      // Leave Room
+          oldMessages.forEach((msg) => {
+            const msgDiv = document.createElement("div");
+            msgDiv.innerHTML = `<strong>${msg.from_user}:</strong> ${msg.message}`;
+            document.getElementById("messages").appendChild(msgDiv);
+          });
+
+          socket.emit("joinRoom", { username: user.username, room });
+
+          document.getElementById("roomTitle").innerText = "Room: " + room;
+          document.getElementById("roomSelection").style.display = "none";
+          document.getElementById("chatArea").style.display = "block";
+        });
+
+      // LEAVE ROOM
       document.getElementById("leaveRoomBtn").addEventListener("click", () => {
         socket.emit("leaveRoom", {
           username: user.username,
           room: currentRoom,
         });
 
-        chatArea.style.display = "none";
-        roomSelection.style.display = "block";
-        messages.innerHTML = "";
+        document.getElementById("chatArea").style.display = "none";
+        document.getElementById("roomSelection").style.display = "block";
+        document.getElementById("messages").innerHTML = "";
+
+        currentRoom = null;
       });
 
-      // Logout
+      // SEND MESSAGE
+      document.getElementById("sendBtn").addEventListener("click", () => {
+        const messageInput = document.getElementById("messageInput");
+        const msg = messageInput.value;
+
+        if (!msg || !currentRoom) return;
+
+        socket.emit("groupMessage", {
+          room: currentRoom,
+          from_user: user.username,
+          message: msg,
+        });
+
+        messageInput.value = "";
+      });
+
+      // RECEIVE MESSAGE
+      socket.on("groupMessage", (data) => {
+        const msgDiv = document.createElement("div");
+        msgDiv.innerHTML = `<strong>${data.from_user}:</strong> ${data.message}`;
+
+        const messages = document.getElementById("messages");
+        messages.appendChild(msgDiv);
+        messages.scrollTop = messages.scrollHeight;
+      });
+
+      // LOGOUT
       document.getElementById("logoutBtn").addEventListener("click", () => {
         localStorage.removeItem("chatUser");
         window.location.href = "login.html";
