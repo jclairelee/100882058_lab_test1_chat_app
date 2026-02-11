@@ -7,6 +7,7 @@ const cors = require("cors");
 const { Server } = require("socket.io");
 
 const connectDB = require("./config/db");
+const GroupMessage = require("./models/GroupMessage");
 
 const app = express();
 app.use(cors());
@@ -37,6 +38,28 @@ io.on("connection", (socket) => {
   socket.on("leaveRoom", ({ username, room }) => {
     socket.leave(room);
     console.log(username + " left " + room);
+  });
+
+  socket.on("groupMessage", async ({ room, from_user, message }) => {
+    try {
+      const newMessage = new GroupMessage({
+        from_user,
+        room,
+        message,
+      });
+
+      await newMessage.save();
+
+      // send message to everyone in that room
+      io.to(room).emit("groupMessage", {
+        from_user,
+        message,
+        room,
+        date_sent: newMessage.date_sent,
+      });
+    } catch (err) {
+      console.error("Error saving message:", err.message);
+    }
   });
 
   socket.on("disconnect", () => console.log("Socket disconnected:", socket.id));
